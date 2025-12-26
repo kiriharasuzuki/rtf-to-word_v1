@@ -3,15 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RTF to Word 変換くん</title>
-    <script src="https://cdn.jsdelivr.net/npm/pandoc-wasm@0.1.7/dist/index.browser.js"></script>
+    <title>RTF to Word 変換くん (修正版)</title>
     <style>
         body { font-family: 'Helvetica Neue', Arial, sans-serif; background-color: #f4f7f9; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
         .container { background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); width: 100%; max-width: 450px; text-align: center; }
         h1 { color: #333; font-size: 1.5rem; margin-bottom: 1.5rem; }
         #drop-zone { border: 2px dashed #007bff; border-radius: 8px; padding: 40px 20px; cursor: pointer; transition: background 0.3s; color: #007bff; margin-bottom: 1rem; }
         #drop-zone:hover { background: #eef6ff; }
-        #status { margin-top: 1rem; color: #555; font-size: 0.9rem; }
+        #status { margin-top: 1rem; color: #555; font-size: 0.9rem; word-break: break-all; }
         .loader { border: 4px solid #f3f3f3; border-top: 4px solid #007bff; border-radius: 50%; width: 30px; height: 30px; animation: spin 2s linear infinite; display: none; margin: 10px auto; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
@@ -26,19 +25,16 @@
     <div id="status">ファイルを選択してください</div>
 </div>
 
-<script>
+<script type="module">
+    import { Pandoc } from "https://unpkg.com/pandoc-wasm@0.1.7/dist/index.js";
+
     const dropZone = document.getElementById('drop-zone');
     const fileInput = document.getElementById('file-input');
     const status = document.getElementById('status');
     const loader = document.getElementById('loader');
 
-    // クリックでファイル選択を開く
     dropZone.onclick = () => fileInput.click();
-
-    // ファイルが選択された時の処理
     fileInput.onchange = (e) => handleFile(e.target.files[0]);
-
-    // ドラッグ＆ドロップの処理
     dropZone.ondragover = (e) => { e.preventDefault(); dropZone.style.background = "#eef6ff"; };
     dropZone.ondragleave = () => { dropZone.style.background = "none"; };
     dropZone.ondrop = (e) => {
@@ -49,33 +45,35 @@
 
     async function handleFile(file) {
         if (!file) return;
-        if (!file.name.endsWith('.rtf')) {
-            status.innerText = "エラー: RTFファイルを選択してください";
+        if (!file.name.toLowerCase().endsWith('.rtf')) {
+            status.innerText = "エラー: .rtf ファイルを選択してください";
             return;
         }
 
-        status.innerText = "変換エンジンを起動中...";
+        status.innerText = "エンジンを初期化中（初回は数秒かかります）...";
         loader.style.display = "block";
 
         try {
             // Pandocの初期化
-            const pandoc = new PandocWasm.Pandoc();
+            const pandoc = new Pandoc();
+            await pandoc.init();
             
-            // ファイルの読み込み
             const arrayBuffer = await file.arrayBuffer();
             const uint8Array = new Uint8Array(arrayBuffer);
 
-            // 変換実行 (RTF -> DOCX)
-            // 日本語ANSI(CP932)はPandocが内部の \ansicpg932 を見て自動判別します
+            // 変換実行
             const result = await pandoc.run({
                 text: uint8Array,
                 from: "rtf",
                 to: "docx",
-                options: [],
                 files: { "input.rtf": uint8Array }
             });
 
-            // ダウンロード処理
+            if (!result.data) {
+                throw new Error("変換データが空です。");
+            }
+
+            // ダウンロード
             const blob = new Blob([result.data], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -83,10 +81,10 @@
             a.download = file.name.replace(/\.rtf$/i, '.docx');
             a.click();
             
-            status.innerText = "変換成功！保存されました。";
+            status.innerText = "変換成功！";
         } catch (error) {
             console.error(error);
-            status.innerText = "エラーが発生しました: " + error.message;
+            status.innerText = "エラー: " + error.message;
         } finally {
             loader.style.display = "none";
         }
