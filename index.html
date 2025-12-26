@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RTF to Word 変換くん (修正版)</title>
+    <title>RTF to Word 変換くん</title>
     <style>
         body { font-family: 'Helvetica Neue', Arial, sans-serif; background-color: #f4f7f9; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
         .container { background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); width: 100%; max-width: 450px; text-align: center; }
@@ -50,38 +50,42 @@
             return;
         }
 
-        status.innerText = "エンジンを初期化中（初回は数秒かかります）...";
+        status.innerText = "Wordへ変換中...";
         loader.style.display = "block";
 
         try {
-            // Pandocの初期化
             const pandoc = new Pandoc();
             await pandoc.init();
             
             const arrayBuffer = await file.arrayBuffer();
             const uint8Array = new Uint8Array(arrayBuffer);
 
-            // 変換実行
+            // 修正ポイント: バイナリ(docx)出力のために引数を明示的に指定
             const result = await pandoc.run({
-                text: uint8Array,
-                from: "rtf",
-                to: "docx",
+                arguments: ['input.rtf', '-t', 'docx', '-o', 'output.docx'],
                 files: { "input.rtf": uint8Array }
             });
 
-            if (!result.data) {
-                throw new Error("変換データが空です。");
+            // 生成された output.docx ファイルを取り出す
+            const docxData = result.files["output.docx"];
+
+            if (!docxData) {
+                throw new Error("Wordデータの生成に失敗しました。");
             }
 
-            // ダウンロード
-            const blob = new Blob([result.data], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
+            // ダウンロード処理
+            const blob = new Blob([docxData], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = file.name.replace(/\.rtf$/i, '.docx');
+            // ファイル名の末尾を .docx に書き換える
+            a.download = file.name.replace(/\.rtf$/i, '') + ".docx";
+            document.body.appendChild(a);
             a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
             
-            status.innerText = "変換成功！";
+            status.innerText = "変換成功！Word形式で保存しました。";
         } catch (error) {
             console.error(error);
             status.innerText = "エラー: " + error.message;
