@@ -3,33 +3,33 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RTF to Word 変換 Ver 2.0</title>
+    <title>RTF to Word 変換 Ver 3.0</title>
     <style>
-        body { font-family: 'Helvetica Neue', Arial, sans-serif; background-color: #f0f2f5; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+        body { font-family: 'Helvetica Neue', Arial, sans-serif; background-color: #e8f5e9; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
         .container { background: white; padding: 2.5rem; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); width: 100%; max-width: 450px; text-align: center; }
-        h1 { color: #1a73e8; font-size: 1.6rem; margin-bottom: 0.5rem; }
-        .version { font-size: 0.8rem; color: #999; margin-bottom: 1.5rem; }
-        #drop-zone { border: 2px dashed #4285f4; border-radius: 12px; padding: 50px 20px; cursor: pointer; transition: all 0.3s; color: #4285f4; background: #f8fbff; }
-        #drop-zone:hover { background: #e8f0fe; border-color: #1a73e8; }
-        #status { margin-top: 1.5rem; color: #5f6368; font-size: 0.95rem; font-weight: 500; min-height: 1.2em; }
-        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #34a853; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; display: none; margin: 15px auto; }
+        h1 { color: #2e7d32; font-size: 1.6rem; margin-bottom: 0.5rem; }
+        .version { font-size: 0.8rem; color: #666; margin-bottom: 1.5rem; font-weight: bold; }
+        #drop-zone { border: 2px dashed #4caf50; border-radius: 12px; padding: 40px 20px; cursor: pointer; transition: all 0.3s; color: #2e7d32; background: #f1f8e9; }
+        #drop-zone:hover { background: #dcedc8; }
+        #status { margin-top: 1.5rem; color: #555; font-size: 0.95rem; min-height: 1.2em; }
+        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #4caf50; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; display: none; margin: 15px auto; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        #download-link { display: none; margin-top: 20px; text-decoration: none; background: #2e7d32; color: white; padding: 12px 24px; border-radius: 8px; font-weight: bold; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
     </style>
 </head>
 <body>
 
 <div class="container">
     <h1>RTF → Word 変換</h1>
-    <div class="version">Version 2.0 (Word出力強化版)</div>
+    <div class="version">Version 3.0 (強制Word出力版)</div>
     
-    <div id="drop-zone">
-        ここにRTFファイルをドロップ<br>
-        <span style="font-size: 0.8rem; opacity: 0.7;">(またはクリックして選択)</span>
-    </div>
+    <div id="drop-zone">ここにRTFファイルをドロップ</div>
     
     <input type="file" id="file-input" style="display:none" accept=".rtf">
     <div id="loader" class="loader"></div>
     <div id="status">準備完了</div>
+    
+    <a id="download-link">Wordファイルをダウンロード</a>
 </div>
 
 <script type="module">
@@ -39,25 +39,22 @@
     const fileInput = document.getElementById('file-input');
     const status = document.getElementById('status');
     const loader = document.getElementById('loader');
+    const downloadLink = document.getElementById('download-link');
 
     dropZone.onclick = () => fileInput.click();
     fileInput.onchange = (e) => handleFile(e.target.files[0]);
-    dropZone.ondragover = (e) => { e.preventDefault(); dropZone.style.background = "#e8f0fe"; };
-    dropZone.ondragleave = () => { dropZone.style.background = "#f8fbff"; };
+    dropZone.ondragover = (e) => { e.preventDefault(); dropZone.style.background = "#dcedc8"; };
+    dropZone.ondragleave = () => { dropZone.style.background = "#f1f8e9"; };
     dropZone.ondrop = (e) => {
         e.preventDefault();
-        dropZone.style.background = "#f8fbff";
+        dropZone.style.background = "#f1f8e9";
         handleFile(e.dataTransfer.files[0]);
     };
 
     async function handleFile(file) {
         if (!file) return;
-        if (!file.name.toLowerCase().endsWith('.rtf')) {
-            status.innerHTML = "<span style='color:red'>エラー: RTFファイルを選択してください</span>";
-            return;
-        }
-
-        status.innerText = "Wordファイルを生成中...";
+        downloadLink.style.display = "none";
+        status.innerHTML = "処理中...";
         loader.style.display = "block";
 
         try {
@@ -67,37 +64,37 @@
             const arrayBuffer = await file.arrayBuffer();
             const uint8Array = new Uint8Array(arrayBuffer);
 
-            // 変換実行: 出力先を強制的に output.docx という仮想ファイルにする
+            // 変換実行 (引数をより厳密に指定)
             const result = await pandoc.run({
-                arguments: ['input.rtf', '-t', 'docx', '-o', 'output.docx'],
+                arguments: ['-f', 'rtf', '-t', 'docx', '-o', 'output.docx', 'input.rtf'],
                 files: { "input.rtf": uint8Array }
             });
 
-            // 仮想ファイルからWordデータを取り出す
             const docxData = result.files["output.docx"];
 
-            if (!docxData || docxData.length === 0) {
-                throw new Error("Wordデータの作成に失敗しました。");
+            if (!docxData) throw new Error("変換に失敗しました。RTFの内容を確認してください。");
+
+            // --- 重要：Wordファイルかどうかの検証 ---
+            // Word(.docx)の実体はZIPファイルなので、先頭2バイトは必ず「PK」(50 4B)になります。
+            if (docxData[0] !== 0x50 || docxData[1] !== 0x4B) {
+                throw new Error("生成されたデータがWord形式ではありません（RTFとして出力された可能性があります）。");
             }
 
-            // ダウンロード実行
+            // ダウンロードリンクの作成
             const blob = new Blob([docxData], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
             const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
             
-            // ファイル名を確実に .docx に変更
             const newFileName = file.name.replace(/\.[^/.]+$/, "") + ".docx";
-            a.download = newFileName;
             
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
+            downloadLink.href = url;
+            downloadLink.download = newFileName;
+            downloadLink.style.display = "inline-block";
+            downloadLink.innerText = "Wordを保存する (.docx)";
             
-            status.innerHTML = "<span style='color:#34a853'>成功！「" + newFileName + "」を保存しました。</span>";
+            status.innerHTML = "<span style='color:#2e7d32'>変換成功！下のボタンを押して保存してください。</span>";
         } catch (error) {
-            console.error("詳細エラー:", error);
-            status.innerHTML = "<span style='color:red'>失敗: " + error.message + "</span>";
+            console.error(error);
+            status.innerHTML = "<span style='color:red'>エラー: " + error.message + "</span>";
         } finally {
             loader.style.display = "none";
         }
