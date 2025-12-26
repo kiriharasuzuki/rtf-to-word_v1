@@ -2,98 +2,98 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>RTF to Word 変換 V5</title>
+    <title>RTF to Word 変換 V6</title>
+    <script src="https://unpkg.com/docx@7.1.0/build/index.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
     <style>
-        body { font-family: sans-serif; background-color: #fce4ec; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+        body { font-family: sans-serif; background-color: #e3f2fd; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
         .container { background: white; padding: 2rem; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 100%; max-width: 400px; text-align: center; }
-        h1 { color: #d81b60; font-size: 1.4rem; }
-        #drop-zone { border: 3px dashed #f06292; border-radius: 12px; padding: 50px 20px; cursor: pointer; color: #d81b60; background: #fff1f5; font-weight: bold; }
-        #status { margin-top: 1.5rem; font-size: 0.9rem; color: #880e4f; }
-        #result-area { display: none; margin-top: 20px; }
-        .download-btn { display: inline-block; text-decoration: none; background: #d81b60; color: white; padding: 12px 25px; border-radius: 8px; font-weight: bold; cursor: pointer; }
+        h1 { color: #1565c0; font-size: 1.4rem; }
+        #drop-zone { border: 3px dashed #1e88e5; border-radius: 12px; padding: 50px 20px; cursor: pointer; color: #1565c0; background: #f1f8e9; font-weight: bold; background: #e3f2fd; }
+        #status { margin-top: 1.5rem; font-size: 0.9rem; color: #0d47a1; background: #f5f5f5; padding: 10px; border-radius: 5px; min-height: 40px; }
+        .btn { display: none; margin-top: 20px; text-decoration: none; background: #1565c0; color: white; padding: 12px 25px; border-radius: 8px; font-weight: bold; cursor: pointer; border: none; width: 100%; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1>RTF → Word (V5)</h1>
-    <p style="font-size: 0.8rem; color: #666;">エンジン不要・直接変換方式</p>
+    <h1>RTF → 本物のWord (V6)</h1>
+    <p style="font-size: 0.8rem; color: #666;">ライブラリによる正規docx生成方式</p>
     <div id="drop-zone">ここにRTFファイルをドロップ</div>
     <input type="file" id="file-input" style="display:none" accept=".rtf">
-    
     <div id="status">準備完了</div>
-    
-    <div id="result-area">
-        <a id="download-link" class="download-btn">Word形式(.docx)で保存</a>
-    </div>
+    <button id="download-btn" class="btn">Word形式(.docx)を保存</button>
 </div>
 
 <script>
     const dropZone = document.getElementById('drop-zone');
     const fileInput = document.getElementById('file-input');
     const status = document.getElementById('status');
-    const resultArea = document.getElementById('result-area');
-    const downloadLink = document.getElementById('download-link');
+    const downloadBtn = document.getElementById('download-btn');
 
     dropZone.onclick = () => fileInput.click();
     fileInput.onchange = (e) => handleFile(e.target.files[0]);
-    dropZone.ondragover = (e) => { e.preventDefault(); dropZone.style.background = "#f8bbd0"; };
-    dropZone.ondragleave = () => { dropZone.style.background = "#fff1f5"; };
+    dropZone.ondragover = (e) => { e.preventDefault(); dropZone.style.background = "#bbdefb"; };
+    dropZone.ondragleave = () => { dropZone.style.background = "#e3f2fd"; };
     dropZone.ondrop = (e) => { e.preventDefault(); handleFile(e.dataTransfer.files[0]); };
 
     async function handleFile(file) {
         if (!file) return;
-        status.innerText = "読み込み中...";
-        resultArea.style.display = "none";
+        status.innerText = "RTFを解析中...";
+        downloadBtn.style.display = "none";
 
-        try {
-            // 1. RTFファイルをテキストとして読み込む
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                const content = e.target.result;
+        const reader = new FileReader();
+        reader.onload = async function(e) {
+            try {
+                const rtfText = e.target.result;
                 
-                // 2. Wordが解釈できるHTML形式のDocxデータを作成
-                // 日本語ANSI(Shift-JIS)対応のためcharsetを指定したHTMLを生成
-                const htmlContent = `
-                    <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
-                    <head><meta charset='utf-8'></head>
-                    <body>${convertRtfToPseudoHtml(content)}</body>
-                    </html>`;
+                // RTFからテキストを抽出（簡易的な正規表現）
+                const plainText = extractTextFromRtf(rtfText);
+                
+                status.innerText = "正規Wordドキュメントを構成中...";
 
-                // 3. Blobを作成（Word文書として認識させる）
-                const blob = new Blob(['\ufeff', htmlContent], {
-                    type: 'application/msword'
+                // docxライブラリを使用して本物のWordファイルを組み立てる
+                const doc = new docx.Document({
+                    sections: [{
+                        properties: {},
+                        children: plainText.split('\n').map(line => 
+                            new docx.Paragraph({
+                                children: [new docx.TextRun(line)],
+                            })
+                        ),
+                    }],
                 });
 
-                // 4. ダウンロード準備
-                const url = URL.createObjectURL(blob);
-                const fileName = file.name.replace(/\.[^/.]+$/, "") + ".docx";
+                // バイナリとして書き出し
+                const blob = await docx.Packer.toBlob(doc);
                 
-                downloadLink.href = url;
-                downloadLink.download = fileName;
+                status.innerText = "変換完了！";
+                downloadBtn.style.display = "block";
                 
-                status.innerText = "変換できました！";
-                resultArea.style.display = "block";
-            };
-            reader.readAsText(file); // RTFは基本テキストベース
+                downloadBtn.onclick = () => {
+                    saveAs(blob, file.name.replace(/\.[^/.]+$/, "") + ".docx");
+                };
 
-        } catch (err) {
-            status.innerText = "エラー: " + err.message;
-        }
+            } catch (err) {
+                console.error(err);
+                status.innerText = "エラー: " + err.message;
+            }
+        };
+        // 日本語ANSI(Shift-JIS)として読み込むための試行
+        reader.readAsText(file, 'Shift_JIS'); 
     }
 
-    // 簡易的なRTF→テキスト抽出（日本語の文字化け回避を試みる）
-    function convertRtfToPseudoHtml(rtf) {
-        // RTFの制御文を除去し、プレーンテキストに近い形にする簡易ロジック
-        let text = rtf.replace(/\\rtf1|\\ansicpg\d+|\\deff\d+|\\fonttbl[\s\S]*?\}|\\colortbl[\s\S]*?\}|\\stylesheet[\s\S]*?\}|\\info[\s\S]*?\}/g, "");
-        text = text.replace(/\\par/g, "<br>"); // 改行の処理
-        text = text.replace(/\\f\d+|\\fs\d+|\\cf\d+|\\lang\d+/g, ""); // 装飾タグの除去
-        text = text.replace(/\{|\}/g, ""); // ブラケットの除去
-        
-        // RTF特有の日本語エスケープ (\'82\'a0 等) をデコードする（簡易版）
-        return text.replace(/\\'[0-9a-fA-F]{2}/g, (match) => {
-            return ""; // ここでは簡易化のため除去。ブラウザの自動認識に期待
-        }).trim();
+    function extractTextFromRtf(rtf) {
+        // 基本的なRTFタグを除去
+        let result = rtf.replace(/\\rtf1[\s\S]*?\{\*\\fonttbl[\s\S]*?\}|\\colortbl[\s\S]*?\}|\\stylesheet[\s\S]*?\}|\\info[\s\S]*?\}/g, "");
+        // 改行コードの置換
+        result = result.replace(/\\par/g, "\n");
+        // その他の制御文字（\f0, \fs24 など）を削除
+        result = result.replace(/\\[a-z0-9-]+/g, "");
+        // 残った中括弧を削除
+        result = result.replace(/\{|\}/g, "");
+        // 連続する空行を整理
+        return result.trim();
     }
 </script>
 
